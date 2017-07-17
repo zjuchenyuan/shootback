@@ -7,6 +7,7 @@ from common_func import *
 __author__ = "Aploium <i@z.codes>"
 __website__ = "https://github.com/aploium/shootback"
 
+__all__ = ['shootback_slaver']
 
 class Slaver:
     """
@@ -336,6 +337,22 @@ def main_slaver():
 
     run_slaver(communicate_addr, target_addr, max_spare_count=max_spare_count)
 
+def shootback_slaver(master_host, master_port, target_host, target_port, max_spare_count=5):
+    """
+    this function will enter the forever loop, if you want run multiple slaver in one process, please use threading yourself
+    shootback_slaver("master.example.com", 12345, "ip.cn", 80) plus shootback_master(12345, 10080) means:
+        then user can do this:
+            curl http://master.example.com:10080/ -H "Host: ip.cn"
+    TODO: fix hard-coded SPARE_SLAVER_TTL and SECRET_KEY
+    """
+    global SPARE_SLAVER_TTL
+    global SECRET_KEY
+    SECRET_KEY = 'shootback'
+    CtrlPkg.recalc_crc32()
+    SPARE_SLAVER_TTL = 300
+    configure_logging(logging.INFO)
+    run_slaver((master_host, master_port), (target_host, target_port), max_spare_count=max_spare_count)
+    
 
 if __name__ == '__main__':
     main_slaver()

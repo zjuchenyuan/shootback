@@ -8,6 +8,7 @@ _listening_sockets = []  # for close at exit
 __author__ = "Aploium <i@z.codes>"
 __website__ = "https://github.com/aploium/shootback"
 
+__all__ = ['shootback_master']
 
 @atexit.register
 def close_listening_socket_at_exit():
@@ -93,16 +94,17 @@ class Master:
             daemon=True,
         )
 
-    def serve_forever(self):
+    def serve_forever(self, wait=True):
         if not self.external_slaver:
             self.thread_pool["listen_slaver"].start()
         self.thread_pool["heart_beat_daemon"].start()
         self.thread_pool["listen_customer"].start()
         self.thread_pool["assign_slaver_daemon"].start()
         self.thread_pool["socket_bridge"] = self.socket_bridge.start_as_daemon()
-
-        while True:
-            time.sleep(10)
+        
+        if wait:
+            while True:
+                time.sleep(10)
 
     def _transfer_complete(self, addr_customer):
         """a callback for SocketBridge, do some cleanup jobs"""
@@ -339,13 +341,13 @@ class Master:
             self.pending_customers.put((conn_customer, addr_customer))
 
 
-def run_master(communicate_addr, customer_listen_addr):
+def run_master(communicate_addr, customer_listen_addr, wait=True):
     log.info("shootback {} running as master".format(version_info()))
     log.info("author: {}  site: {}".format(__author__, __website__))
     log.info("slaver from: {} customer from: {}".format(
         fmt_addr(communicate_addr), fmt_addr(customer_listen_addr)))
 
-    Master(customer_listen_addr, communicate_addr).serve_forever()
+    Master(customer_listen_addr, communicate_addr).serve_forever(wait=wait)
 
 
 def argparse_master():
@@ -422,6 +424,21 @@ def main_master():
 
     run_master(communicate_addr, customer_listen_addr)
 
+def shootback_master(communicate_port, listen_port, communicate_host='0.0.0.0', listen_host='0.0.0.0', wait=False):
+    """
+    shootback_master(12345, 10080) means:
+        our users can visit myip:10080 to get what they want (notice HTTP Header Host), 
+        and the port used for slaver communication is 12345
+        this function will create a Master object, but do NOT wait, unless you specify wait=True
+    For simplicity, you cannot change the global variable SPARE_SLAVER_TTL and SECRET_KEY. TODO: fix this
+    """
+    global SPARE_SLAVER_TTL
+    global SECRET_KEY
+    SECRET_KEY = 'shootback'
+    CtrlPkg.recalc_crc32()
+    SPARE_SLAVER_TTL = 300
+    configure_logging(logging.INFO)
+    run_master((communicate_host, communicate_port), (listen_host, listen_port), wait=wait)
 
 if __name__ == '__main__':
     main_master()
